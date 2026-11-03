@@ -51,10 +51,29 @@ if not GROQ_API_KEY:
 # LLM
 # =========================
 
+# Override with GROQ_MODEL in .env if Groq retires or renames this model.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+# The free Groq tier limits tokens per minute (8,000 for this model), so cap
+# reply length and retry briefly if the limit is still hit.
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key=SecretStr(GROQ_API_KEY)
+    model=GROQ_MODEL,
+    api_key=SecretStr(GROQ_API_KEY),
+    max_tokens=2500,
+    max_retries=3,
 )
+
+# Maximum characters of each research result included in a prompt (~4 chars/token).
+MAX_FLIGHT_CHARS = 3000
+MAX_HOTEL_CHARS = 2500
+MAX_ITINERARY_CHARS = 7000
+
+
+def clip(text: str, max_chars: int) -> str:
+    """Truncate long text so prompts stay within the model's token limit."""
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rsplit("\n", 1)[0] + "\n...[truncated]"
 
 
 # =========================
@@ -122,10 +141,10 @@ User Query:
 {state['user_query']}
 
 Flight Results:
-{state['flight_results']}
+{clip(state['flight_results'], MAX_FLIGHT_CHARS)}
 
 Hotel Results:
-{state['hotel_results']}
+{clip(state['hotel_results'], MAX_HOTEL_CHARS)}
 
 Make the itinerary practical, budget-aware, and easy to follow.
 """
@@ -155,13 +174,13 @@ User Request:
 {state['user_query']}
 
 Flights:
-{state['flight_results']}
+{clip(state['flight_results'], MAX_FLIGHT_CHARS)}
 
 Hotels:
-{state['hotel_results']}
+{clip(state['hotel_results'], MAX_HOTEL_CHARS)}
 
 Itinerary:
-{state['itinerary']}
+{clip(state['itinerary'], MAX_ITINERARY_CHARS)}
 
 Format the final answer beautifully using these sections:
 
