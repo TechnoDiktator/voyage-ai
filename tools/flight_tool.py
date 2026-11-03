@@ -527,6 +527,10 @@ def format_flight(flight: dict):
     arr_delay_text = f"{arr_delay} minutes" if arr_delay is not None else "N/A"
 
     return f"""
+
+
+
+    
 Airline: {airline}
 Flight: {flight_number}
 Status: {status}
