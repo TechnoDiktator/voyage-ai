@@ -91,6 +91,38 @@ with the thread ID. The current `/api/travel` response includes the answer,
 flight results, hotel results, itinerary, and LLM call count; the weather data
 is used internally to create the plan.
 
+## MCP servers
+
+The app uses `langchain-mcp-adapters` (`MultiServerMCPClient`, configured in
+`mcp_client.py`) to talk to three MCP servers.
+
+| Server | Transport | Where it runs | Tools used | Purpose |
+|---|---|---|---|---|
+| **Tavily** | `streamable_http` | Remote, hosted at `mcp.tavily.com` | Web search | Hotel and destination research. Requires `TAVILY_API_KEY`. |
+| **AviationStack** | `stdio` | Local subprocess (`uvx aviationstack-mcp`), which calls the remote AviationStack HTTPS API | `list_airports`, `list_airlines` | Airport and airline reference data. Requires `AVIATIONSTACK_API_KEY` (passed to the process as `AVIATION_STACK_API_KEY`). Needs `uv`/`uvx` installed. |
+| **Weather** | `stdio` | Local subprocess (`custom_weather_mcp_server.py`, built with FastMCP) | `get_current_weather`, `get_forecast` | Current weather and forecast from OpenWeather. Requires `OPENWEATHER_API_KEY`. The forecast returns only the first 5 entries. |
+
+With `stdio`, the client starts the server as a child process and talks to it
+over stdin/stdout, so no network hop exists at the MCP layer. The local
+AviationStack and Weather servers still make outbound HTTPS calls to their
+upstream APIs.
+
+## Agents
+
+Each agent is a LangGraph node that reads and updates the shared `TravelState`
+(`backend.py`). They run sequentially.
+
+| # | Agent | Data source | What it does | Writes to state |
+|---|---|---|---|---|
+| 1 | `flight_agent` | AviationStack MCP + Groq LLM | Fetches airport and airline lists (each truncated to 3000 characters) and asks the LLM to produce route guidance. Fares and durations are model estimates, not live quotes. | `flight_results` |
+| 2 | `hotel_agent` | Tavily MCP | Searches the web for "Best hotels for <query>". No LLM call. | `hotel_results` |
+| 3 | `weather_agent` | Weather MCP + Groq LLM | Extracts the destination city from the query (LLM), then fetches current weather and the forecast. | `weather_results` |
+| 4 | `itinerary_agent` | Groq LLM | Combines the query with flight, hotel and weather results into a practical, budget-aware itinerary. | `itinerary` |
+| 5 | `final_agent` | Groq LLM | Formats the final answer: trip summary, flights, hotels, weather, day-by-day plan, budget and recommendations. | `messages` (final answer) |
+
+`llm_calls` counts the LLM calls made during a run. State is checkpointed in
+PostgreSQL per `thread_id`, so follow-up requests can continue a conversation.
+
 ## Important data limitations
 
 - The AviationStack MCP calls used by the current workflow are `list_airports`

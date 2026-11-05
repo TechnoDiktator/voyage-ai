@@ -46,9 +46,14 @@ WEATHER_ENV["OPENWEATHER_API_KEY"] = (
 # LLM
 # ==========================================
 
+# Override with GROQ_MODEL in .env if Groq retires or renames this model.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key=GROQ_API_KEY
+    model=GROQ_MODEL,
+    api_key=GROQ_API_KEY,
+    max_tokens=500,
+    max_retries=3
 )
 
 
