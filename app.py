@@ -9,11 +9,17 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from backend import run_travel_agent
+# This is to allow nested event loops for async calls in FastAPI
+import nest_asyncio
+nest_asyncio.apply()
+
+
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(
-    title="Voyage AI",
+    title="VoyageAI",
     description="LangGraph Multi-Agent Holiday Planner with FastAPI Frontend",
     version="1.0.0"
 )
