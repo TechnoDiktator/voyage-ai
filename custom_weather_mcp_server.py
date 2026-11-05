@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-mcp = FastMCP("Weather MCP Server")
+mcp = FastMCP("CustomWeather MCP Server")
 
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
