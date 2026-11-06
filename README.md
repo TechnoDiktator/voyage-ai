@@ -1,4 +1,4 @@
-# Voyage AI (TripMate AI)
+﻿# Voyage AI
 
 A multi-agent travel planner built with **LangGraph**, **FastAPI** and the **Model Context Protocol (MCP)**. A supervisor agent screens each request, routes it to specialist agents that call live MCP tools, and pauses for **human approval** before producing the final plan. State is checkpointed in **PostgreSQL**.
 
@@ -14,6 +14,20 @@ A multi-agent travel planner built with **LangGraph**, **FastAPI** and the **Mod
 | **Durable state** | `PostgresSaver` stores each thread, so a paused plan can resume across requests. |
 | **Token-budget control** | Tool outputs are clipped before prompting to stay within Groq's per-request token limit. |
 | **Graceful degradation** | If an MCP tool fails, the agent falls back to clearly labelled general guidance instead of failing the run. |
+
+## Screenshots
+
+**Home page and draft itinerary awaiting approval**
+
+![Voyage AI home and approval flow](voyage/Screenshot%202026-11-06%20154621.png)
+
+**Agent workflow pipeline with supervisor decision (human review pending)**
+
+![Agent workflow pipeline](voyage/Screenshot%202026-11-06%20154237.png)
+
+**Agent workflow diagram**
+
+![Agent workflow diagram](voyage/Screenshot%202026-11-06%20154419.png)
 
 ## Architecture
 

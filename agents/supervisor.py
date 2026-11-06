@@ -1,4 +1,4 @@
-"""Supervisor agent: input guardrail plus dynamic routing to specialist agents."""
+﻿"""Supervisor agent: input guardrail plus dynamic routing to specialist agents."""
 
 from langchain_core.messages import AIMessage
 
@@ -82,7 +82,7 @@ def supervisor_agent(state: TravelState):
 
     if not allowed:
         reason = guardrail_reason or (
-            "TripMate AI can only help with travel-planning requests. "
+            "Voyage AI can only help with travel-planning requests. "
             "Please ask about a destination, flight, hotel, weather, budget, "
             "or itinerary."
         )
