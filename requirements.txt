@@ -62,7 +62,6 @@ pydantic_core==2.50.1
 PyJWT==2.15.1
 python-dotenv==1.2.2
 python-multipart==0.0.32
-pywin32==312
 PyYAML==6.0.3
 referencing==0.37.0
 regex==2026.9.29
