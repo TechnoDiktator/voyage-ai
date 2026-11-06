@@ -30,8 +30,16 @@
             </h1>
 
             <p>
-                Search flights, discover hotels, and generate a complete travel itinerary with MCP , Langgraph , Human In the LOOP and Guardrails.
+                A supervisor agent picks the right specialists, a guardrail keeps requests on-topic,
+                and you approve the draft itinerary before it is finalized.
             </p>
+
+            <div class="feature-chips">
+                <span class="chip chip-rose">Input guardrail</span>
+                <span class="chip chip-peach">Supervisor routing</span>
+                <span class="chip chip-mint">MCP tools</span>
+                <span class="chip chip-lavender">Human approval</span>
+            </div>
         </section>
 
         <section class="planner-card">
@@ -86,17 +94,64 @@
 
             <div class="result-header">
                 <div>
-                    <h2>Your AI Travel Plan</h2>
+                    <h2 id="resultTitle">Your AI Travel Plan</h2>
                     <p id="threadInfo">Thread ID: -</p>
                 </div>
 
                 <div class="result-actions">
-                    <button class="copy-btn" onclick="copyResult()">
+                    <span id="statusBadge" class="status-badge hidden"></span>
+
+                    <button id="copyBtn" class="copy-btn" onclick="copyResult()">
                         Copy
                     </button>
 
-                    <button class="download-btn" onclick="downloadPDF()">
+                    <button id="downloadBtn" class="download-btn" onclick="downloadPDF()">
                         Download PDF
+                    </button>
+
+                    <button class="new-btn" onclick="startNewPlan()">
+                        New plan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Shown when the input guardrail rejects the request -->
+            <div id="guardrailBanner" class="guardrail-banner hidden">
+                <strong>Request blocked by guardrail</strong>
+                <p id="guardrailReason"></p>
+            </div>
+
+            <!-- Agent pipeline: guardrail > supervisor > specialists > itinerary > human review > final -->
+            <div id="workflowPanel" class="workflow-panel">
+                <h3>Agent workflow</h3>
+                <ol id="pipeline" class="pipeline"></ol>
+
+                <div id="supervisorBox" class="supervisor-box hidden">
+                    <h4>Supervisor decision</h4>
+                    <p id="supervisorReasoning"></p>
+                    <div id="constraintChips" class="constraint-chips"></div>
+                </div>
+            </div>
+
+            <!-- Human-in-the-loop review -->
+            <div id="approvalPanel" class="approval-panel hidden">
+                <h3>Review the draft itinerary</h3>
+                <p id="approvalRequest">
+                    Approve the draft below, or request changes and the final plan will apply your feedback.
+                </p>
+
+                <textarea
+                    id="feedbackInput"
+                    placeholder="Optional for approval. Required for revision, e.g. 'Make it cheaper and add more food spots.'"
+                ></textarea>
+
+                <div class="approval-actions">
+                    <button id="approveBtn" class="approve-btn" onclick="submitApproval(true)">
+                        Approve and finalize
+                    </button>
+
+                    <button id="reviseBtn" class="revise-btn" onclick="submitApproval(false)">
+                        Request revision
                     </button>
                 </div>
             </div>
@@ -106,6 +161,11 @@
                 <div id="resultBox" class="result-box"></div>
             </div>
 
+            <!-- Raw output from each specialist agent -->
+            <div id="agentOutputs" class="agent-outputs hidden">
+                <h3>Specialist agent outputs</h3>
+            </div>
+
         </section>
 
         <section id="errorBox" class="error-box hidden"></section>
@@ -113,7 +173,7 @@
     </main>
 
     <footer>
-        Built with FastAPI, LangGraph, Groq, PostgreSQL, Tavily and AviationStack
+        Built with FastAPI, LangGraph, Groq, PostgreSQL and MCP (Tavily, AviationStack, OpenWeather)
     </footer>
 
     <!-- Markdown Renderer -->

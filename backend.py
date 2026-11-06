@@ -56,11 +56,16 @@ if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY is missing. Please add it to your .env file.")
 
 # =========================
-# LLM - original model kept
+# LLM
 # =========================
+# Override with GROQ_MODEL in .env if Groq retires or renames this model.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=GROQ_MODEL,
     api_key=GROQ_API_KEY,
+    max_tokens=3500,
+    max_retries=3,
 )
 
 # =========================
@@ -88,6 +93,8 @@ class TravelState(TypedDict, total=False):
     approval_request: str
     approved: bool
     human_feedback: str
+    # Number of rejected drafts so far; capped by MAX_REVISIONS.
+    revision_count: int
     final_response: str
 
     llm_calls: int
@@ -96,6 +103,24 @@ class TravelState(TypedDict, total=False):
 # =========================
 # Shared helpers
 # =========================
+# Maximum number of "request revision" rounds before the plan is finalized.
+MAX_REVISIONS = 3
+
+# Groq free tier allows 8000 tokens/minute per request (prompt + max_tokens).
+# Roughly 4 characters per token, so these caps keep prompts well under that.
+CLIP_LIMITS = {
+    "flight": 2000,
+    "hotel": 2000,
+    "weather": 1200,
+    "budget": 1500,
+    "itinerary": 5000,
+    "previous_draft": 4000,
+}
+
+
+def _clip(text: Any, limit: int) -> str:
+    text = str(text or "")
+    return text if len(text) <= limit else text[:limit] + "\n...[truncated]"
 KNOWN_AGENTS = {
     "flight_agent",
     "hotel_agent",
@@ -457,13 +482,13 @@ Trip Constraints:
 {state.get('trip_constraints', {})}
 
 Flight Results:
-{state.get('flight_results', '')}
+{_clip(state.get('flight_results', ''), CLIP_LIMITS['flight'])}
 
 Hotel Results:
-{state.get('hotel_results', '')}
+{_clip(state.get('hotel_results', ''), CLIP_LIMITS['hotel'])}
 
 Weather Results:
-{state.get('weather_results', '')}
+{_clip(state.get('weather_results', ''), CLIP_LIMITS['weather'])}
 
 Return:
 1. Estimated cost categories
@@ -492,6 +517,17 @@ If exact live prices are unavailable, clearly label estimates as approximate.
 # Itinerary Agent - original behavior extended with selected results
 # =========================
 def itinerary_agent(state: TravelState):
+    # On a revision round, show the model the previous draft and the user's feedback.
+    revision_block = ""
+    if state.get("human_feedback") and state.get("itinerary"):
+        revision_block = f"""
+Previous Draft (to revise):
+{_clip(state['itinerary'], CLIP_LIMITS['previous_draft'])}
+
+User Feedback (apply this to the new draft):
+{state['human_feedback']}
+"""
+
     prompt = f"""
 Create a complete travel itinerary.
 
@@ -502,17 +538,17 @@ Trip Constraints:
 {state.get('trip_constraints', {})}
 
 Flight Results:
-{state.get('flight_results', '')}
+{_clip(state.get('flight_results', ''), CLIP_LIMITS['flight'])}
 
 Hotel Results:
-{state.get('hotel_results', '')}
+{_clip(state.get('hotel_results', ''), CLIP_LIMITS['hotel'])}
 
 Weather Results:
-{state.get('weather_results', '')}
+{_clip(state.get('weather_results', ''), CLIP_LIMITS['weather'])}
 
 Budget Results:
-{state.get('budget_results', '')}
-
+{_clip(state.get('budget_results', ''), CLIP_LIMITS['budget'])}
+{revision_block}
 Make the itinerary practical, budget-aware, and easy to follow.
 Create a clear draft that is ready for human review.
 """
@@ -524,10 +560,17 @@ Create a clear draft that is ready for human review.
         ]
     )
 
-    approval_request = (
-        "Please review the generated draft itinerary. Approve it to create the "
-        "final polished plan, or provide feedback for revision."
-    )
+    revision_count = state.get("revision_count", 0)
+    if revision_count:
+        approval_request = (
+            f"Revision {revision_count} of {MAX_REVISIONS}: the draft was updated "
+            "with your feedback. Approve it, or request another change."
+        )
+    else:
+        approval_request = (
+            "Please review the generated draft itinerary. Approve it to create the "
+            "final polished plan, or provide feedback for revision."
+        )
 
     return {
         "itinerary": response.content,
@@ -558,12 +601,24 @@ def human_approval_agent(state: TravelState):
 
     approved = bool(review.get("approved", False))
     human_feedback = str(review.get("feedback", "")).strip()
+    revision_count = state.get("revision_count", 0)
 
     return {
         "approved": approved,
         "human_feedback": human_feedback,
+        # Each rejection consumes one revision round.
+        "revision_count": revision_count if approved else revision_count + 1,
         "messages": [AIMessage(content="Human approval step completed.")],
     }
+
+
+def route_after_approval(state: TravelState) -> str:
+    """Loop back to the itinerary until approved or the revision cap is hit."""
+    if state.get("approved", False):
+        return "final_agent"
+    if state.get("revision_count", 0) >= MAX_REVISIONS:
+        return "final_agent"
+    return "itinerary_agent"
 
 
 # =========================
@@ -593,19 +648,19 @@ Supervisor Constraints:
 {state.get('trip_constraints', {})}
 
 Flights:
-{state.get('flight_results', '')}
+{_clip(state.get('flight_results', ''), CLIP_LIMITS['flight'])}
 
 Hotels:
-{state.get('hotel_results', '')}
+{_clip(state.get('hotel_results', ''), CLIP_LIMITS['hotel'])}
 
 Weather:
-{state.get('weather_results', '')}
+{_clip(state.get('weather_results', ''), CLIP_LIMITS['weather'])}
 
 Budget Analysis:
-{state.get('budget_results', '')}
+{_clip(state.get('budget_results', ''), CLIP_LIMITS['budget'])}
 
 Draft Itinerary:
-{state.get('itinerary', '')}
+{_clip(state.get('itinerary', ''), CLIP_LIMITS['itinerary'])}
 
 Format the final answer beautifully using these sections:
 1. Trip Summary
@@ -712,7 +767,11 @@ graph.add_conditional_edges(
 )
 
 graph.add_edge("itinerary_agent", "human_approval")
-graph.add_edge("human_approval", "final_agent")
+graph.add_conditional_edges(
+    "human_approval",
+    route_after_approval,
+    {"itinerary_agent": "itinerary_agent", "final_agent": "final_agent"},
+)
 graph.add_edge("final_agent", END)
 graph.add_edge("guardrail_blocked", END)
 
@@ -783,10 +842,14 @@ def _serialize_result(
         "guardrail_reason": result.get("guardrail_reason", ""),
         "approved": result.get("approved"),
         "human_feedback": result.get("human_feedback", ""),
+        "revision_count": result.get("revision_count", 0),
+        "max_revisions": MAX_REVISIONS,
         "llm_calls": result.get("llm_calls", 0),
     }
 
 
+
+# this is the function to start a new travel-planning run and pause at human approval . This will run in app.py
 def run_travel_agent(user_input: str, thread_id: str | None = None):
     """Start a new travel-planning run and pause at human approval."""
     if not thread_id:
@@ -811,7 +874,7 @@ def run_travel_agent(user_input: str, thread_id: str | None = None):
             "approval_request": "",
             "approved": False,
             "human_feedback": "",
-            "final_response": "",
+            "revision_count": 0,
             "llm_calls": 0,
         },
         config=config,
