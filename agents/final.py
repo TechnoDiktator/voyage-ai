@@ -56,6 +56,14 @@ Format the final answer beautifully using these sections:
 6. Estimated Budget
 7. Final Recommendations
 
+Day-by-day table rules (strict):
+- For each day use a Markdown table with exactly these columns: | Time | Activity | Cost |
+- Put the price of every priced item ONLY in the Cost column, with the currency
+  (for example "INR 500"). Do not repeat the price inside the Activity text.
+- Use "Free" for free items and "-" only for non-activities such as rest.
+- End each day with a bold line: **Day total: <amount>**
+- Use the same currency everywhere, matching the user's request.
+
 Important:
 - Be clear and practical.
 - Mention that live flight APIs may not provide ticket prices when pricing is unavailable.

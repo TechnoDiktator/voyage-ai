@@ -394,6 +394,19 @@ textarea::placeholder {
     font-weight: 800;
 }
 
+/* Itinerary tables: keep Time and Cost compact, let Activity take the space. */
+.result-box th:first-child,
+.result-box td:first-child {
+    white-space: nowrap;
+    width: 1%;
+}
+
+.result-box th:last-child:not(:first-child),
+.result-box td:last-child:not(:first-child) {
+    white-space: nowrap;
+    width: 1%;
+}
+
 .error-box {
     margin-top: 22px;
     padding: 18px 20px;

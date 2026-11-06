@@ -42,6 +42,9 @@ Weather Results:
 Budget Results:
 {clip(state.get('budget_results', ''), CLIP_LIMITS['budget'])}
 {revision_block}
+Format each day as a Markdown table with columns | Time | Activity | Cost |.
+Put every price only in the Cost column (with currency, "Free" if free), never
+inside the Activity text, and end each day with **Day total: <amount>**.
 Make the itinerary practical, budget-aware, and easy to follow.
 Create a clear draft that is ready for human review.
 """
