@@ -104,6 +104,23 @@ class TravelState(TypedDict, total=False):
 # Shared helpers
 # =========================
 # Maximum number of "request revision" rounds before the plan is finalized.
+def _as_text(value) -> str:
+    """Flatten MCP tool output (str, or list of content blocks) into plain text."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = []
+        for item in value:
+            if isinstance(item, dict) and "text" in item:
+                parts.append(str(item["text"]))
+            else:
+                parts.append(_as_text(item))
+        return "\n".join(parts)
+    if isinstance(value, dict):
+        return str(value.get("text", value))
+    return "" if value is None else str(value)
+
+
 MAX_REVISIONS = 3
 
 # Groq free tier allows 8000 tokens/minute per request (prompt + max_tokens).
@@ -233,6 +250,9 @@ User request:
     supervisor_prompt = f"""
 You are the supervisor of a multi-agent travel-planning system.
 Choose only the specialist agents needed for the request.
+For a full trip-planning request (a destination with a duration or itinerary),
+always include weather_agent, because the plan needs weather and packing advice.
+Skip weather_agent only for narrow requests such as a flight-only or hotel-only question.
 
 Available agents:
 - flight_agent: flights, airports, airlines, routes, airfare, or booking advice
@@ -826,10 +846,10 @@ def _serialize_result(
             if interrupt_payload
             else result.get("approval_request", "")
         ),
-        "flight_results": result.get("flight_results", ""),
-        "hotel_results": result.get("hotel_results", ""),
-        "weather_results": result.get("weather_results", ""),
-        "budget_results": result.get("budget_results", ""),
+        "flight_results": _as_text(result.get("flight_results", "")),
+        "hotel_results": _as_text(result.get("hotel_results", "")),
+        "weather_results": _as_text(result.get("weather_results", "")),
+        "budget_results": _as_text(result.get("budget_results", "")),
         "itinerary": (
             interrupt_payload.get("draft_itinerary", "")
             if interrupt_payload

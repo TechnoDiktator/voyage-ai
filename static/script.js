@@ -184,7 +184,9 @@ function renderAgentOutputs(data) {
         const body = document.createElement("pre");
 
         summary.textContent = field.label;
-        body.textContent = String(value).trim();
+        body.textContent = typeof value === "string"
+            ? value.trim()
+            : JSON.stringify(value, null, 2);
 
         details.appendChild(summary);
         details.appendChild(body);

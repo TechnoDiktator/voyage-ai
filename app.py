@@ -18,6 +18,8 @@ nest_asyncio.apply()
 
 BASE_DIR = Path(__file__).resolve().parent
 
+
+# this is my fast api server
 app = FastAPI(
     title="TripMate AI",
     description=(
@@ -49,10 +51,15 @@ class ApprovalRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    # File mtimes act as a cache-busting version for the static assets.
+    static_version = max(
+        int((BASE_DIR / "static" / name).stat().st_mtime)
+        for name in ("style.css", "script.js")
+    )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={},
+        context={"static_version": static_version},
     )
 
 
